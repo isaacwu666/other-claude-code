@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Navbar } from "./components/Navbar";
 import { IdentityPanel } from "./components/IdentityPanel";
 import { TokenManagerDialog } from "./components/TokenManagerDialog";
+import { ProviderConfigDialog } from "./components/ProviderConfigDialog";
 import { ThemeProvider } from "./lib/theme";
 import { getUuid, setUuid, apiBind, setActiveApiToken } from "./api/client";
 import { ACPDirectView } from "./components/ACPDirectView";
 import { useTokens } from "./hooks/useTokens";
+import { useProviderConfig } from "./hooks/useProviderConfig";
 
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })));
 const SessionDetail = lazy(() => import("./pages/SessionDetail").then((m) => ({ default: m.SessionDetail })));
@@ -14,8 +16,10 @@ export default function App() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
+  const [providerDialogOpen, setProviderDialogOpen] = useState(false);
   const [acpDirect, setAcpDirect] = useState<{ url: string; token: string } | null>(null);
   const { tokens, activeTokenId, activeLabel, activeTokenValue, setActiveTokenId, addToken, removeToken, updateToken } = useTokens();
+  const { config: providerConfig, setField: setProviderField, providerTitle, commandPreview, hasConfiguredKey } = useProviderConfig();
 
   // Sync active token to API client
   useEffect(() => {
@@ -111,7 +115,9 @@ export default function App() {
         <Navbar
           onIdentityClick={() => setIdentityOpen(true)}
           onTokenClick={() => setTokenDialogOpen(true)}
+          onProviderClick={() => setProviderDialogOpen(true)}
           activeTokenLabel={currentSessionId ? undefined : activeLabel}
+          providerLabel={hasConfiguredKey ? providerTitle : undefined}
           sessionTitle={currentSessionId || (acpDirect ? "ACP" : undefined)}
           onBack={(currentSessionId || acpDirect) ? navigateToDashboard : undefined}
         />
@@ -139,6 +145,14 @@ export default function App() {
           onAdd={addToken}
           onRemove={removeToken}
           onUpdate={updateToken}
+        />
+
+        <ProviderConfigDialog
+          open={providerDialogOpen}
+          onClose={() => setProviderDialogOpen(false)}
+          config={providerConfig}
+          onChange={setProviderField}
+          commandPreview={commandPreview}
         />
       </div>
     </ThemeProvider>

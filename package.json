@@ -46,6 +46,7 @@
     "build:vite:only": "vite build",
     "build:bun": "bun run build.ts",
     "dev": "bun run scripts/dev.ts",
+    "dev:services": "bun run scripts/dev-services.ts",
     "dev:inspect": "bun run scripts/dev-debug.ts",
     "prepublishOnly": "bun run build",
     "lint": "biome lint src/",

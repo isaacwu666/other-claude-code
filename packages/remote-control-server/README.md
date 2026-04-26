@@ -166,6 +166,13 @@ bun install
 # 开发模式（热重载）
 bun run dev
 
+# 启动完整服务栈（rcs backend + web ui + agent worker）
+# 在仓库根目录执行：
+bun run dev:services
+
+# 如果你只想启动 backend + web（不拉起 worker）：
+RCS_START_WORKER=0 bun run dev:services
+
 # 类型检查
 bun run typecheck
 

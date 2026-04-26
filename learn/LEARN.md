@@ -76,6 +76,8 @@
 
 理解 Claude 如何定义、注册、调用工具。先读框架，再挑具体工具。
 
+详细笔记：[phase-3-agent-main-flow-study-map.md](phase-3-agent-main-flow-study-map.md)
+
 - [ ] `src/Tool.ts` — Tool 接口定义
   - [ ] `Tool` 类型结构（name、description、inputSchema、call）
   - [ ] `findToolByName`、`toolMatchesName` 工具函数

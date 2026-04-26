@@ -43,8 +43,8 @@ import { randomUUID, type UUID } from 'node:crypto'
 import type { Message } from '../../types/message.js'
 import { deserializeMessages } from '../../utils/conversationRecovery.js'
 import { getLastSessionLog, sessionIdExists } from '../../utils/sessionStorage.js'
-import { QueryEngine } from '../../QueryEngine.js'
 import type { QueryEngineConfig } from '../../QueryEngine.js'
+import { SessionRuntimeFacade } from '../../runtime-service/SessionRuntimeFacade.js'
 import type { Tools } from '../../Tool.js'
 import { getTools } from '../../tools.js'
 import { getEmptyToolPermissionContext } from '../../Tool.js'
@@ -72,7 +72,7 @@ import { getModelOptions } from '../../utils/model/modelOptions.js'
 // ── Session state ─────────────────────────────────────────────────
 
 type AcpSession = {
-  queryEngine: QueryEngine
+  runtime: SessionRuntimeFacade
   cancelled: boolean
   cwd: string
   sessionFingerprint: string
@@ -271,15 +271,15 @@ export class AcpAgent implements Agent {
       // Reset the query engine's abort controller for a fresh query.
       // After a previous interrupt(), the internal controller is stuck in
       // aborted state — without this, submitMessage() fails immediately.
-      session.queryEngine.resetAbortController()
+      session.runtime.resetAbortController()
 
-      const sdkMessages = session.queryEngine.submitMessage(promptInput)
+      const sdkMessages = session.runtime.submitMessage(promptInput)
 
       const { stopReason, usage } = await forwardSessionUpdates(
         params.sessionId,
         sdkMessages,
         this.conn,
-        session.queryEngine.getAbortSignal(),
+        session.runtime.getAbortSignal(),
         session.toolUseCache,
         this.clientCapabilities,
         session.cwd,
@@ -357,7 +357,7 @@ export class AcpAgent implements Agent {
     session.pendingMessages.clear()
 
     // Interrupt the query engine to abort the current API call
-    session.queryEngine.interrupt()
+    session.runtime.interrupt()
   }
 
   // ── setSessionMode ──────────────────────────────────────────────
@@ -386,7 +386,7 @@ export class AcpAgent implements Agent {
     }
     // Store the raw value — QueryEngine.submitMessage() calls
     // parseUserSpecifiedModel() to resolve aliases (e.g. "sonnet" → "glm-5.1-turbo")
-    session.queryEngine.setModel(params.modelId)
+    session.runtime.setModel(params.modelId)
     await this.updateConfigOption(params.sessionId, 'model', params.modelId)
   }
 
@@ -422,7 +422,7 @@ export class AcpAgent implements Agent {
         },
       })
     } else if (params.configId === 'model') {
-      session.queryEngine.setModel(value)
+      session.runtime.setModel(value)
     }
 
     this.syncSessionConfigState(session, params.configId, value)
@@ -517,7 +517,7 @@ export class AcpAgent implements Agent {
       initialMessages: opts.initialMessages,
     }
 
-    const queryEngine = new QueryEngine(engineConfig)
+    const runtime = new SessionRuntimeFacade(engineConfig)
 
     // Build modes — bypassPermissions only available when not running as root (or in sandbox)
     const availableModes = [
@@ -549,13 +549,13 @@ export class AcpAgent implements Agent {
     }
 
     // Set the model on the engine
-    queryEngine.setModel(currentModel)
+    runtime.setModel(currentModel)
 
     // Build config options
     const configOptions = buildConfigOptions(modes, models)
 
     const session: AcpSession = {
-      queryEngine,
+      runtime,
       cancelled: false,
       cwd,
       modes,

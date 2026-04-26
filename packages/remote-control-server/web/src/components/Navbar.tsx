@@ -1,16 +1,26 @@
 import { cn } from "../lib/utils";
 import { ThemeToggle } from "../../components/ui/theme-toggle";
-import { ChevronLeft, LayoutGrid, UserPlus, KeyRound } from "lucide-react";
+import { ChevronLeft, LayoutGrid, UserPlus, KeyRound, Cpu } from "lucide-react";
 
 interface NavbarProps {
   onIdentityClick: () => void;
   onTokenClick: () => void;
+  onProviderClick: () => void;
   activeTokenLabel?: string | null;
+  providerLabel?: string;
   sessionTitle?: string;
   onBack?: () => void;
 }
 
-export function Navbar({ onIdentityClick, onTokenClick, activeTokenLabel, sessionTitle, onBack }: NavbarProps) {
+export function Navbar({
+  onIdentityClick,
+  onTokenClick,
+  onProviderClick,
+  activeTokenLabel,
+  providerLabel,
+  sessionTitle,
+  onBack,
+}: NavbarProps) {
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-surface-1/80 backdrop-blur-md">
       <div className="mx-auto flex h-11 sm:h-12 max-w-5xl items-center justify-between px-3 sm:px-4">
@@ -65,6 +75,21 @@ export function Navbar({ onIdentityClick, onTokenClick, activeTokenLabel, sessio
           >
             <KeyRound className="h-4 w-4" />
             <span className="hidden sm:inline max-w-24 truncate">{activeTokenLabel || "No Token"}</span>
+          </button>
+          <button
+            onClick={onProviderClick}
+            className={cn(
+              "flex items-center gap-1 rounded-md px-2 sm:px-3 py-1.5 text-sm transition-colors",
+              providerLabel
+                ? "bg-brand/10 text-brand hover:bg-brand/20"
+                : "text-text-secondary hover:bg-surface-2 hover:text-text-primary",
+            )}
+            title="Model Provider"
+          >
+            <Cpu className="h-4 w-4" />
+            <span className="hidden sm:inline max-w-32 truncate">
+              {providerLabel || "Provider"}
+            </span>
           </button>
           <button
             onClick={onIdentityClick}

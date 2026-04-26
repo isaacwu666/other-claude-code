@@ -5,12 +5,13 @@ import {
   apiInterrupt,
 } from "../api/client";
 import type { Session, SessionEvent } from "../types";
-import { isClosedSessionStatus, formatTime, cn } from "../lib/utils";
+import { isClosedSessionStatus, formatTime } from "../lib/utils";
 import { Info } from "lucide-react";
 import { RCSChatAdapter } from "../lib/rcs-chat-adapter";
 import type { ThreadEntry, PendingPermission } from "../lib/types";
 import { StatusBadge } from "../components/Navbar";
-import { TaskPanel } from "../components/TaskPanel";
+import { SideConsolePanel } from "../components/SideConsolePanel";
+import { useDomainEvents } from "../hooks/useDomainEvents";
 import {
   PermissionPromptView,
   AskUserPanelView,
@@ -35,12 +36,13 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [taskPanelOpen, setTaskPanelOpen] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [showMeta, setShowMeta] = useState(false);
   const [entries, setEntries] = useState<ThreadEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingPermissions, setPendingPermissions] = useState<PendingPermission[]>([]);
   const adapterRef = useRef<RCSChatAdapter | null>(null);
+  const domainEvents = useDomainEvents(sessionId);
 
   // Create RCSChatAdapter
   const adapter = useMemo(
@@ -279,10 +281,10 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
                   <Info className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => setTaskPanelOpen(!taskPanelOpen)}
+                  onClick={() => setSidePanelOpen(prev => !prev)}
                   className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-2 transition-colors"
                 >
-                  Tasks
+                  {sidePanelOpen ? "Hide Panels" : "Show Panels"}
                 </button>
               </div>
             </div>
@@ -297,43 +299,53 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           </div>
         </div>
 
-        {/* Chat messages — unified ChatView */}
-        <ChatView
-          entries={entries}
-          isLoading={isLoading}
-          emptyTitle="开始对话"
-          emptyDescription="输入消息开始聊天"
-        />
+        <div className="min-h-0 flex-1">
+          <div className="flex h-full min-h-0">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <ChatView
+                entries={entries}
+                isLoading={isLoading}
+                emptyTitle="开始对话"
+                emptyDescription="输入消息开始聊天"
+              />
 
-        {/* Unified Permission Panel — above input */}
-        {pendingPermissions.length > 0 && (
-          <div className="border-t bg-surface-1 px-4 py-3">
-            <div className="mx-auto max-w-3xl space-y-3">
-              {pendingPermissions.map((req) => (
-                <PermissionEventView
-                  key={req.requestId}
-                  request={req}
-                  onApprove={() => handleApprovePermission(req.requestId)}
-                  onReject={() => handleRejectPermission(req.requestId)}
-                  onSubmitAnswers={handleSubmitAnswers}
-                  onSubmitPlan={handleSubmitPlanResponse}
-                />
-              ))}
+              {pendingPermissions.length > 0 && (
+                <div className="border-t bg-surface-1 px-4 py-3">
+                  <div className="mx-auto max-w-3xl space-y-3">
+                    {pendingPermissions.map((req) => (
+                      <PermissionEventView
+                        key={req.requestId}
+                        request={req}
+                        onApprove={() => handleApprovePermission(req.requestId)}
+                        onReject={() => handleRejectPermission(req.requestId)}
+                        onSubmitAnswers={handleSubmitAnswers}
+                        onSubmitPlan={handleSubmitPlanResponse}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <ChatInput
+                onSubmit={handleSubmit}
+                isLoading={isLoading}
+                onInterrupt={handleInterrupt}
+                disabled={closed}
+                placeholder={closed ? "会话已关闭" : "输入消息..."}
+              />
             </div>
+
+          {sidePanelOpen && (
+              <div className="w-[360px] min-w-[320px] max-w-[45vw]">
+                <SideConsolePanel
+                  entries={entries}
+                  pendingPermissions={pendingPermissions}
+                  domainEvents={domainEvents}
+                />
+              </div>
+          )}
           </div>
-        )}
-
-        {/* Unified ChatInput — claude.ai style */}
-        <ChatInput
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-          onInterrupt={handleInterrupt}
-          disabled={closed}
-          placeholder={closed ? "会话已关闭" : "输入消息..."}
-        />
-
-        {/* Task Panel */}
-        {taskPanelOpen && <TaskPanel onClose={() => setTaskPanelOpen(false)} />}
+        </div>
       </div>
     </TooltipProvider>
   );

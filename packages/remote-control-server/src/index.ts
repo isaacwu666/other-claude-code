@@ -22,6 +22,7 @@ import v2CodeSessions from "./routes/v2/code-sessions";
 import v2Worker from "./routes/v2/worker";
 import v2WorkerEventsStream from "./routes/v2/worker-events-stream";
 import v2WorkerEvents from "./routes/v2/worker-events";
+import v3SessionDomainEvents from "./routes/v3/session-domain-events";
 import webAuth from "./routes/web/auth";
 import webSessions from "./routes/web/sessions";
 import webControl from "./routes/web/control";
@@ -87,6 +88,7 @@ app.route("/web", webAuth);
 app.route("/web", webSessions);
 app.route("/web", webControl);
 app.route("/web", webEnvironments);
+app.route("/web/v3", v3SessionDomainEvents);
 
 // ACP protocol routes
 console.log("[RCS] ACP support enabled");
