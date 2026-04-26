@@ -464,11 +464,8 @@ import {
 } from '../utils/autoRunIssue.js';
 import type { HookProgress } from '../types/hooks.js';
 import { TungstenLiveMonitor } from '@claude-code-best/builtin-tools/tools/TungstenTool/TungstenLiveMonitor.js';
-/* eslint-disable @typescript-eslint/no-require-imports */
-const WebBrowserPanelModule = feature('WEB_BROWSER_TOOL')
-  ? (require('@claude-code-best/builtin-tools/tools/WebBrowserTool/WebBrowserPanel.js') as typeof import('@claude-code-best/builtin-tools/tools/WebBrowserTool/WebBrowserPanel.js'))
-  : null;
-/* eslint-enable @typescript-eslint/no-require-imports */
+// WebBrowserPanel removed — browser-lite returns results inline via tool_result.
+// For full browser interaction use Claude-in-Chrome MCP tools.
 import { IssueFlagBanner } from '../components/PromptInput/IssueFlagBanner.js';
 import { useIssueFlagBanner } from '../hooks/useIssueFlagBanner.js';
 import { CompanionSprite, CompanionFloatingBubble, MIN_COLS_FOR_FULL_SPRITE } from '../buddy/CompanionSprite.js';
@@ -642,6 +639,7 @@ function TranscriptSearchBar({
   const [indexStatus, setIndexStatus] = React.useState<'building' | { ms: number } | null>('building');
   React.useEffect(() => {
     let alive = true;
+    let hideTimeout: ReturnType<typeof setTimeout> | undefined;
     const warm = jumpRef.current?.warmSearchIndex;
     if (!warm) {
       setIndexStatus(null); // VML not mounted yet — rare, skip indicator
@@ -655,14 +653,14 @@ function TranscriptSearchBar({
         setIndexStatus(null);
       } else {
         setIndexStatus({ ms });
-        setTimeout(() => alive && setIndexStatus(null), 2000);
+        hideTimeout = setTimeout(() => alive && setIndexStatus(null), 2000);
       }
     });
     return () => {
       alive = false;
+      if (hideTimeout) clearTimeout(hideTimeout);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount-only: bar opens once per /
+  }, [jumpRef]); // mount-only per stable search bar ref
   // Gate the query effect on warm completion. setHighlight stays instant
   // (screen-space overlay, no indexing). setSearchQuery (the scan) waits.
   const warmDone = indexStatus !== 'building';
@@ -670,8 +668,7 @@ function TranscriptSearchBar({
     if (!warmDone) return;
     jumpRef.current?.setSearchQuery(query);
     setHighlight(query);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, warmDone]);
+  }, [jumpRef, query, setHighlight, warmDone]);
   const off = cursorOffset;
   const cursorChar = off < query.length ? query[off] : ' ';
   return (
@@ -3054,12 +3051,22 @@ export function REPL({
             // are O(n) per render, so drop everything before the previous
             // boundary to keep n bounded across multi-day sessions.
             if (isFullscreenEnvEnabled()) {
-              setMessages(old => [
-                ...getMessagesAfterCompactBoundary(old, {
+              setMessages(old => {
+                const postBoundary = getMessagesAfterCompactBoundary(old, {
                   includeSnipped: true,
-                }),
-                newMessage,
-              ]);
+                })
+                // Hard cap: keep at most 500 messages in fullscreen scrollback
+                // to prevent unbounded memory growth in multi-day sessions.
+                // normalizeMessages/applyGrouping are O(n), and Ink fiber
+                // trees cost ~250KB RSS per message. Without this cap,
+                // scrollback after several compactions can reach thousands
+                // of messages (observed: 13k+, 1GB+ heap).
+                const MAX_FULLSCREEN_SCROLLBACK = 500
+                const kept = postBoundary.length > MAX_FULLSCREEN_SCROLLBACK
+                  ? postBoundary.slice(-MAX_FULLSCREEN_SCROLLBACK)
+                  : postBoundary
+                return [...kept, newMessage]
+              });
             } else {
               setMessages(() => [newMessage]);
             }
@@ -3085,17 +3092,23 @@ export function REPL({
             // history). Replacing those leaves the AgentTool UI stuck at
             // "Initializing…" because it renders the full progress trail.
             setMessages(oldMessages => {
-              const last = oldMessages.at(-1);
-              const lastData = last?.data as Record<string, unknown> | undefined;
               const newData = newMessage.data as Record<string, unknown>;
-              if (
-                last?.type === 'progress' &&
-                last.parentToolUseID === newMessage.parentToolUseID &&
-                lastData?.type === newData.type
-              ) {
-                const copy = oldMessages.slice();
-                copy[copy.length - 1] = newMessage;
-                return copy;
+              // Scan backwards to find the last ephemeral progress with matching
+              // parentToolUseID and type. Previously only checked the last message,
+              // so interleaved non-ephemeral messages caused duplicate progress
+              // entries to accumulate (observed 13k+ entries in sleep-heavy sessions).
+              for (let i = oldMessages.length - 1; i >= 0; i--) {
+                const m = oldMessages[i]!
+                if (m.type !== 'progress') break
+                const mData = m.data as Record<string, unknown> | undefined
+                if (
+                  m.parentToolUseID === newMessage.parentToolUseID &&
+                  mData?.type === newData.type
+                ) {
+                  const copy = oldMessages.slice();
+                  copy[i] = newMessage;
+                  return copy;
+                }
               }
               return [...oldMessages, newMessage];
             });
@@ -4995,16 +5008,19 @@ export function REPL({
     }
   }, [queuedCommands]);
 
+  const onInitRef = useRef(onInit);
+  onInitRef.current = onInit;
+  const diagnosticTrackerRef = useRef(diagnosticTracker);
+  diagnosticTrackerRef.current = diagnosticTracker;
+
   // Initial load
   useEffect(() => {
-    void onInit();
+    void onInitRef.current();
 
     // Cleanup on unmount
     return () => {
-      void diagnosticTracker.shutdown();
+      void diagnosticTrackerRef.current.shutdown();
     };
-    // TODO: fix this
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Listen for suspend/resume events
@@ -5668,7 +5684,7 @@ export function REPL({
                 </Box>
               )}
               {process.env.USER_TYPE === 'ant' && <TungstenLiveMonitor />}
-              {feature('WEB_BROWSER_TOOL') ? WebBrowserPanelModule && <WebBrowserPanelModule.WebBrowserPanel /> : null}
+              {/* WebBrowserPanel removed — browser-lite, no panel */}
               <Box flexGrow={1} />
               {showSpinner && (
                 <SpinnerWithVerb
@@ -6181,8 +6197,8 @@ export function REPL({
                         setInputValue={setInputValue}
                       />
                     )}
-                    {/* Skill improvement survey - appears when improvements detected (ant-only) */}
-                    {process.env.USER_TYPE === 'ant' && skillImprovementSurvey.suggestion && (
+                    {/* Skill improvement survey - appears when improvements detected */}
+                    {skillImprovementSurvey.suggestion && (
                       <SkillImprovementSurvey
                         isOpen={skillImprovementSurvey.isOpen}
                         skillName={skillImprovementSurvey.suggestion.skillName}

@@ -1,11 +1,7 @@
 import { mock, describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { logMock } from "../../../../tests/mocks/log";
 
-mock.module("src/utils/log.ts", () => ({
-  logError: () => {},
-  logToFile: () => {},
-  getLogDisplayTitle: () => "",
-  logEvent: () => {},
-}));
+mock.module("src/utils/log.ts", logMock);
 
 const {
   isExternalPermissionMode,
@@ -74,7 +70,7 @@ describe("permissionModeTitle", () => {
     expect(permissionModeTitle("default")).toBe("Default");
     expect(permissionModeTitle("plan")).toBe("Plan Mode");
     expect(permissionModeTitle("acceptEdits")).toBe("Accept edits");
-    expect(permissionModeTitle("bypassPermissions")).toBe("Bypass Permissions");
+    expect(permissionModeTitle("bypassPermissions")).toBe("Bypass");
     expect(permissionModeTitle("dontAsk")).toBe("Don't Ask");
   });
 

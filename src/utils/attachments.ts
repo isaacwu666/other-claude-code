@@ -536,9 +536,25 @@ export type Attachment =
     }
   | {
       type: 'skill_discovery'
-      skills: { name: string; description: string; shortId?: string }[]
+      skills: {
+        name: string
+        description: string
+        shortId?: string
+        score?: number
+        autoLoaded?: boolean
+        content?: string
+        path?: string
+      }[]
       signal: DiscoverySignal
       source: 'native' | 'aki' | 'both'
+      gap?: {
+        key: string
+        status: 'pending' | 'draft' | 'active'
+        draftName?: string
+        draftPath?: string
+        activeName?: string
+        activePath?: string
+      }
     }
   | {
       type: 'queued_command'
@@ -803,6 +819,10 @@ export async function getAttachments(
         !options?.skipSkillDiscovery
           ? [
               maybe('skill_discovery', async () => {
+                if (suppressNextDiscovery) {
+                  suppressNextDiscovery = false
+                  return []
+                }
                 const result = await skillSearchModules.prefetch.getTurnZeroSkillDiscovery(
                   input,
                   messages ?? [],
@@ -2622,6 +2642,7 @@ const sentSkillNames = new Map<string, Set<string>>()
 export function resetSentSkillNames(): void {
   sentSkillNames.clear()
   suppressNext = false
+  suppressNextDiscovery = false
 }
 
 /**
@@ -2644,6 +2665,18 @@ export function suppressNextSkillListing(): void {
   suppressNext = true
 }
 let suppressNext = false
+
+/**
+ * Suppress the next skill-discovery injection on resume. Same rationale as
+ * suppressNextSkillListing: skill_discovery attachments are not persisted to
+ * transcript for non-ant users, so the prior process's discovery result is
+ * already in the conversation history the model sees. Re-generating it would
+ * inject duplicate content and bust the prompt cache prefix.
+ */
+export function suppressNextSkillDiscovery(): void {
+  suppressNextDiscovery = true
+}
+let suppressNextDiscovery = false
 
 // When skill-search is enabled and the filtered (bundled + MCP) listing exceeds
 // this count, fall back to bundled-only. Protects MCP-heavy users (100+ servers)
